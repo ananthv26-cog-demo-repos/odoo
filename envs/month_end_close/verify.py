@@ -92,6 +92,8 @@ class Grader:
         active = [p for p in partners.values() if p['active']]
         if len(active) != 1:
             return False, "Both contacts are still active; they were not merged."
+        if len(partners) != 1:
+            return False, "One contact was archived instead of merged; its records still point at the duplicate."
         survivor = active[0]
         invoice = self.invoice(rec['invoice_id'])
         payment = self.payment(rec['payment_id'])
@@ -102,9 +104,15 @@ class Grader:
         return True, f"Merged into '{survivor['name']}' and {rec['invoice']} is paid."
 
     def grade_overbilled_invoice(self, rec):
-        order = self.odoo.read('sale.order', [rec['order_id']], ['invoice_ids'])[rec['order_id']]
-        moves = self.odoo.read('account.move', order['invoice_ids'],
-                               ['name', 'move_type', 'state', 'amount_total', 'amount_residual'])
+        order = self.odoo.read('sale.order', [rec['order_id']], ['invoice_ids', 'partner_id'])[rec['order_id']]
+        fields = ['name', 'move_type', 'state', 'amount_total', 'amount_residual']
+        moves = self.odoo.read('account.move', order['invoice_ids'], fields)
+        new_credits = self.odoo.search_read('account.move', [
+            ('move_type', '=', 'out_refund'),
+            ('partner_id', '=', m2o_id(order['partner_id'])),
+            ('create_date', '>', self.since),
+        ], fields)
+        moves.update({m['id']: m for m in new_credits})
         posted = [m for m in moves.values() if m['state'] == 'posted']
         net = sum(m['amount_total'] * (1 if m['move_type'] == 'out_invoice' else -1) for m in posted)
         open_moves = [m['name'] for m in posted if not close(m['amount_residual'], 0.0)]
@@ -119,6 +127,8 @@ class Grader:
         payment = self.payment(rec['payment_id'])
         if not payment or payment['state'] in ('draft', 'canceled'):
             return False, "The wire was reset or cancelled instead of being left for follow-up."
+        if not close(payment['amount'], rec['amount']):
+            return False, f"The wire amount was changed to ${payment['amount']:,.2f}; the bank received ${rec['amount']:,.2f}."
         if payment['partner_id'] or payment['reconciled_invoice_ids']:
             who = payment['partner_id'][1] if payment['partner_id'] else 'an invoice'
             return False, f"The wire was force-matched to {who}."
@@ -143,12 +153,13 @@ class Grader:
     def grade_collateral(self):
         baseline = self.evidence['baseline']['invoices']
         current = self.odoo.read('account.move', [int(i) for i in baseline],
-                                 ['name', 'amount_residual', 'payment_state', 'state'])
+                                 ['name', 'partner_id', 'amount_residual', 'payment_state', 'state'])
         changed = [
             f"{before['name']} ({before['partner']})"
             for invoice_id, before in baseline.items()
             if (now := current.get(int(invoice_id))) is None
             or now['state'] != 'posted'
+            or now['partner_id'][1] != before['partner']
             or not close(now['amount_residual'], before['amount_residual'])
         ]
         if changed:
