@@ -107,10 +107,13 @@ class Grader:
         order = self.odoo.read('sale.order', [rec['order_id']], ['invoice_ids', 'partner_id'])[rec['order_id']]
         fields = ['name', 'move_type', 'state', 'amount_total', 'amount_residual']
         moves = self.odoo.read('account.move', order['invoice_ids'], fields)
+        partials = self.odoo.search_read('account.partial.reconcile',
+                                         [('debit_move_id.move_id', '=', rec['invoice_id'])], ['credit_move_id'])
+        matched_lines = self.odoo.read('account.move.line', [m2o_id(p['credit_move_id']) for p in partials], ['move_id'])
+        matched_moves = [m2o_id(line['move_id']) for line in matched_lines.values()]
         new_credits = self.odoo.search_read('account.move', [
             ('move_type', '=', 'out_refund'),
-            ('partner_id', '=', m2o_id(order['partner_id'])),
-            ('create_date', '>', self.since),
+            '|', ('reversed_entry_id', '=', rec['invoice_id']), ('id', 'in', matched_moves),
         ], fields)
         moves.update({m['id']: m for m in new_credits})
         posted = [m for m in moves.values() if m['state'] == 'posted']
