@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Month-end close environment: Summit Office Supply Co., a wholesaler of office and breakroom supplies.
+        Run with a fixed seed so every build is identical:
+            see envs/month_end_close/run.sh (fixed seed, single worker)
+    -->
+    <record id="world" model="populate.blueprint">
+        <field name="name">Month-End Close - Summit Office Supply Co. (September 2026)</field>
+        <field name="definition_xml" type="xml">
+            <create model="res.partner" count="60" id="customers" scale="False" parallel="False">
+                <value name="counter" generator="misc.counter" start="0"/>
+                <field name="name" eval="['Harbor Coffee Roasters', 'Bluebird Bakery', 'Maple Street Dental', 'Greenleaf Architects', 'Riverside Yoga Studio', 'Northgate Law Group', 'Copper Kettle Diner', 'Sunrise Pediatrics', 'Blue Ridge Realty', 'Oakwood Elementary PTA', 'Pinecrest Veterinary Clinic', 'Lighthouse Books', 'Cedar Hill Accounting', 'Summit Fitness Club', 'Golden Gate Florists', 'Silver Lining Insurance', 'Redwood Coworking', 'Brightside Dental Lab', 'Evergreen Property Management', 'Lakeside Marina', 'Iron Horse Brewing', 'Willow Creek Winery', 'Main Street Barbers', 'Mountain View Chiropractic', 'Starlight Cinema', 'Hilltop Animal Hospital', 'Crescent City Tutoring', 'Parkside Pharmacy', 'Bayview Hotel', 'Old Town Hardware', 'Meadowbrook Senior Living', 'Trailhead Outfitters', 'Rosewood Event Venue', 'Pacific Print Shop', 'Kingfisher Travel Agency', 'Riverbend Pet Grooming', 'Sycamore Family Medicine', 'Blackstone Consulting', 'Juniper Juice Bar', 'Harvest Moon Catering', 'Seaside Surf School', 'Granite Peak Engineering', 'Fox Hollow Farm Store', 'Clearwater Plumbing', 'Twin Pines Motel', 'Lantern Theatre Company', 'Magnolia Hair Salon', 'Canyon Creek Church', 'Beacon Hill Montessori', 'Driftwood Design Studio', 'Orchard Lane Dentistry', 'Quarry Road Auto Repair', 'Stonebridge Physical Therapy', 'Hummingbird Daycare', 'Tidewater Seafood Market', 'Aspen Grove Optometry', 'Windmill Bike Shop', 'Firefly Photography', 'Wildflower Cafe', 'Northstar Tax Services'][counter]" unique="True"/>
+                <value name="slug" eval="''.join(ch for ch in name.lower() if ch.isalnum())"/>
+                <field name="email" eval="f'accounts@{slug}.com'"/>
+                <field name="phone" eval="f'(555) {100 + counter * 7:03d}-{1000 + counter * 137:04d}'"/>
+                <value name="street_name" eval="['Oak', 'Pine', 'Elm', 'Maple', 'Cedar', 'Birch', 'Alder', 'Spruce', 'Willow', 'Hawthorne'][counter % 10]"/>
+                <value name="street_type" eval="['St', 'Ave', 'Blvd', 'Rd', 'Way'][counter % 5]"/>
+                <field name="street" eval="f'{110 + counter * 37} {street_name} {street_type}'"/>
+                <field name="city" eval="['Portland', 'Salem', 'Eugene', 'Bend', 'Medford', 'Corvallis'][counter % 6]"/>
+                <field name="zip" eval="f'97{200 + counter * 3:03d}'"/>
+                <field name="country_id" domain="[('code', '=', 'US')]"/>
+                <field name="customer_rank" eval="1"/>
+            </create>
+
+            <create model="product.template" count="200" id="products" scale="False" parallel="False">
+                <value name="counter" generator="misc.counter" start="0"/>
+                <value name="item" eval="['Copy Paper, Letter (case)', 'Copy Paper, Legal (case)', 'Ballpoint Pens (box of 50)', 'Gel Pens (box of 24)', 'Dry-Erase Markers (set)', 'Sticky Notes (12 pack)', 'Manila File Folders (box)', 'Hanging File Folders (box)', 'Stapler, Heavy Duty', 'Staples (box of 5000)', 'Tape Dispenser', 'Packing Tape (6 rolls)', 'Shipping Boxes, Medium (bundle)', 'Bubble Mailers (100)', 'Printer Toner, Black', 'Printer Toner, Color', 'Ink Cartridge Multipack', 'Laminating Pouches (100)', 'Label Printer Tape', 'Whiteboard, 4x6 ft', 'Ergonomic Mesh Office Chair', 'Standing Desk Frame', 'Desk Lamp, LED', 'Monitor Arm', 'Keyboard and Mouse Set', 'Paper Shredder', 'Filing Cabinet, 3-Drawer', 'Bookshelf, 5-Shelf', 'Coffee Beans, House Blend (5 lb)', 'Paper Cups, 12 oz (1000)', 'Coffee Filters (case)', 'Stir Sticks (box)', 'Countertop Water Dispenser', 'Water Filter Cartridge', 'Paper Towels (case)', 'Hand Soap Refill (gallon)', 'Trash Bags, 33 gal (case)', 'Disinfecting Wipes (6 pack)', 'First Aid Kit, Office', 'Breakroom Snack Box'][counter % 40]"/>
+                <value name="variant" eval="['Standard', 'Premium', 'Economy', 'Bulk', 'Recycled'][counter // 40]"/>
+                <field name="name" eval="item if variant == 'Standard' else f'{item} - {variant}'" unique="True"/>
+                <field name="default_code" eval="f'SOS-{counter + 1:04d}'" unique="True"/>
+                <field name="type" eval="'consu'"/>
+                <field name="is_storable" eval="False"/>
+                <field name="sale_ok" eval="True"/>
+                <field name="invoice_policy" eval="'order'"/>
+                <value name="base_price" generator="scalar.integer" start="8" end="240"/>
+                <field name="list_price" eval="float(base_price * {'Standard': 1.0, 'Premium': 1.5, 'Economy': 0.75, 'Bulk': 4.0, 'Recycled': 1.1}[variant]) // 1"/>
+                <field name="standard_price" eval="round(list_price * 0.6, 2)"/>
+            </create>
+
+            <function model="res.company" name="_build_month_end_close_world">
+                <arg generator="scalar.integer" start="1" end="2000000000"/>
+            </function>
+        </field>
+    </record>
+</odoo>
